@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TandaPay - Dashboard</title>
+    <title>InterTand - Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <!-- Header -->
-    <nav class="bg-white shadow-sm border-b">
+    <nav class="bg-white shadow border-b">
         <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-gray-900">TandaPay Dashboard</h1>
+            <h1 class="text-xl font-bold text-gray-900">InterTand Dashboard</h1>
             <div class="flex items-center space-x-4">
                 <span id="userName" class="text-gray-600"></span>
                 <button onclick="logout()" class="text-red-600 hover:underline">Salir</button>
@@ -19,103 +18,73 @@
     </nav>
 
     <div class="max-w-6xl mx-auto px-4 py-6">
-        <!-- Estadísticas básicas -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="bg-white p-6 rounded-lg shadow">
-                <h3 class="text-lg font-semibold text-gray-700">Mis Tandas</h3>
+            <div class="bg-white p-6 rounded shadow">
+                <h3 class="text-lg font-semibold text-gray-700">Tandas</h3>
                 <p class="text-3xl font-bold text-blue-600" id="totalTandas">0</p>
             </div>
-            <div class="bg-white p-6 rounded-lg shadow">
-                <h3 class="text-lg font-semibold text-gray-700">Total Invertido</h3>
+            <div class="bg-white p-6 rounded shadow">
+                <h3 class="text-lg font-semibold text-gray-700">Total</h3>
                 <p class="text-3xl font-bold text-green-600" id="totalInvertido">$0</p>
             </div>
-            <div class="bg-white p-6 rounded-lg shadow">
-                <h3 class="text-lg font-semibold text-gray-700">Pagos Pendientes</h3>
+            <div class="bg-white p-6 rounded shadow">
+                <h3 class="text-lg font-semibold text-gray-700">Pendientes</h3>
                 <p class="text-3xl font-bold text-orange-600" id="pagosPendientes">0</p>
             </div>
         </div>
 
-        <!-- Formulario para crear tanda -->
-        <div class="bg-white rounded-lg shadow p-6 mb-8">
-            <h2 class="text-xl font-semibold mb-4">Crear Nueva Tanda</h2>
+        <div class="bg-white rounded shadow p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Nueva Tanda</h2>
             <form onsubmit="createTanda(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
                     <input type="text" id="tandaName" required 
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                           class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Monto Total</label>
                     <input type="number" id="totalAmount" required min="1000"
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                           class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Participantes</label>
                     <input type="number" id="maxParticipants" required min="3" max="20"
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                           class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 </div>
                 <div class="md:col-span-3">
                     <button type="submit" 
-                            class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                            class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">
                         Crear Tanda
                     </button>
                 </div>
             </form>
         </div>
 
-        <!-- Lista de tandas -->
-        <div class="bg-white rounded-lg shadow">
+        <div class="bg-white rounded shadow">
             <div class="p-6 border-b">
                 <h2 class="text-xl font-semibold">Tandas Disponibles</h2>
             </div>
             <div id="tandasList" class="divide-y">
-                <!-- Las tandas se cargarán aquí -->
             </div>
         </div>
 
-        <!-- Historial de pagos -->
-        <div class="bg-white rounded-lg shadow mt-8">
+        <div class="bg-white rounded shadow mt-8">
             <div class="p-6 border-b">
                 <h2 class="text-xl font-semibold">Historial de Pagos</h2>
             </div>
             <div id="paymentsList" class="divide-y">
-                <!-- Los pagos se cargarán aquí -->
-            </div>
-        </div>
-
-        <!-- Sección para Interledger -->
-        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mt-8">
-            <h3 class="text-lg font-semibold text-yellow-800 mb-2">🔧 Integración Interledger</h3>
-            <p class="text-yellow-700 mb-4">Esta sección está lista para tu implementación de Open Payments:</p>
-            
-            <div class="bg-white rounded p-4 border">
-                <h4 class="font-medium mb-2">Endpoint disponible:</h4>
-                <code class="text-sm bg-gray-100 p-2 rounded block">POST /api/interledger/payment</code>
-                
-                <div class="mt-4">
-                    <h4 class="font-medium mb-2">Prueba rápida:</h4>
-                    <button onclick="testInterledger()" 
-                            class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">
-                        Probar Endpoint
-                    </button>
-                    <div id="interledgerResult" class="mt-2 text-sm"></div>
-                </div>
             </div>
         </div>
     </div>
 
-    <!-- Mensajes -->
-    <div id="message" class="hidden fixed top-4 right-4 p-4 rounded-md shadow-lg z-50"></div>
+    <div id="message" class="hidden fixed top-4 right-4 p-4 rounded shadow-lg z-50"></div>
 
     <script>
-        // Variables globales
         let currentUser = null;
         let tandas = [];
         let payments = [];
 
-        // Inicializar al cargar la página
         document.addEventListener('DOMContentLoaded', function() {
-            // Verificar si hay usuario logueado
             const userData = localStorage.getItem('user');
             if (!userData) {
                 window.location.href = '/';
@@ -137,7 +106,7 @@
         function showMessage(text, type = 'success') {
             const messageDiv = document.getElementById('message');
             messageDiv.textContent = text;
-            messageDiv.className = `fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 ${type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
+            messageDiv.className = `fixed top-4 right-4 p-4 rounded shadow-lg z-50 ${type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
             messageDiv.classList.remove('hidden');
             
             setTimeout(() => {
@@ -149,8 +118,8 @@
             event.preventDefault();
             
             const name = document.getElementById('tandaName').value;
-            const totalAmount = parseInt(document.getElementById('totalAmount').value);
-            const maxParticipants = parseInt(document.getElementById('maxParticipants').value);
+            const total_amount = parseInt(document.getElementById('totalAmount').value);
+            const max_participants = parseInt(document.getElementById('maxParticipants').value);
             
             try {
                 const response = await fetch('/api/tandas', {
@@ -158,9 +127,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         name,
-                        totalAmount,
-                        maxParticipants,
-                        createdBy: currentUser.id
+                        total_amount,
+                        max_participants
                     })
                 });
                 
@@ -197,23 +165,16 @@
                             <div class="flex justify-between items-start">
                                 <div>
                                     <h3 class="font-semibold text-lg">${tanda.name}</h3>
-                                    <p class="text-gray-600">Creado por: ${tanda.creator_name}</p>
                                     <div class="mt-2 space-y-1">
-                                        <p class="text-sm"><span class="font-medium">Monto:</span> $${tanda.total_amount.toLocaleString()}</p>
-                                        <p class="text-sm"><span class="font-medium">Participantes:</span> ${tanda.current_participants}/${tanda.max_participants}</p>
-                                        <p class="text-sm"><span class="font-medium">Pago mensual:</span> $${(tanda.total_amount / tanda.max_participants).toLocaleString()}</p>
+                                        <p class="text-sm">Monto: $${tanda.total_amount.toLocaleString()}</p>
+                                        <p class="text-sm">Participantes: ${tanda.max_participants}</p>
+                                        <p class="text-sm">Pago mensual: $${(tanda.total_amount / tanda.max_participants).toLocaleString()}</p>
                                     </div>
                                 </div>
-                                <div class="flex space-x-2">
-                                    <button onclick="joinTanda(${tanda.id})" 
-                                            class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">
-                                        Unirse
-                                    </button>
-                                    <button onclick="createPayment(${tanda.id})" 
-                                            class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
-                                        Pagar
-                                    </button>
-                                </div>
+                                <button onclick="createPayment(${tanda.id})" 
+                                        class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
+                                    Pagar
+                                </button>
                             </div>
                         </div>
                     `).join('');
@@ -225,7 +186,7 @@
 
         async function loadPayments() {
             try {
-                const response = await fetch(`/api/payments?userId=${currentUser.id}`);
+                const response = await fetch(`/api/payments/${currentUser.id}`);
                 const data = await response.json();
                 payments = data.payments || [];
                 
@@ -265,11 +226,6 @@
             }
         }
 
-        async function joinTanda(tandaId) {
-            // Esta función puede expandirse para agregar usuarios a tandas
-            showMessage('Funcionalidad de unirse a tanda en desarrollo');
-        }
-
         async function createPayment(tandaId) {
             const amount = prompt('Ingresa el monto del pago:');
             if (!amount || isNaN(amount)) return;
@@ -279,10 +235,10 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        tandaId,
-                        userId: currentUser.id,
+                        tanda_id: tandaId,
+                        user_id: currentUser.id,
                         amount: parseFloat(amount),
-                        type: 'monthly'
+                        type: 'contribution'
                     })
                 });
                 
@@ -296,27 +252,6 @@
                 }
             } catch (error) {
                 showMessage('Error de conexión', 'error');
-            }
-        }
-
-        async function testInterledger() {
-            try {
-                const response = await fetch('/api/interledger/payment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        fromWallet: '$test.sender',
-                        toWallet: '$test.receiver',
-                        amount: 100
-                    })
-                });
-                
-                const data = await response.json();
-                document.getElementById('interledgerResult').innerHTML = 
-                    `<pre class="bg-gray-100 p-2 rounded mt-2">${JSON.stringify(data, null, 2)}</pre>`;
-            } catch (error) {
-                document.getElementById('interledgerResult').innerHTML = 
-                    `<p class="text-red-600 mt-2">Error: ${error.message}</p>`;
             }
         }
     </script>
