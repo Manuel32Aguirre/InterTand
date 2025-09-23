@@ -5,17 +5,24 @@ const bcrypt = require('bcrypt');
 const { createAuthenticatedClient } = require('@interledger/open-payments');
 const fs = require('fs');
 
+// Importar servicios y rutas de Interledger
+const automationService = require('./server/services/automationService');
+const interledgerRoutes = require('./routes/interledger');
+
 const app = express();
 const PORT = 3001;
 
 app.use(express.json());
 app.use(express.static('public'));
 
+// Rutas de Interledger
+app.use('/api/interledger', interledgerRoutes);
+
 const dbConfig = {
     host: 'localhost',
-    port: 3307,
-    user: 'manuel',
-    password: '1234',
+    port: 3306,
+    user: 'root',
+    password: 'Cuatecon23+',
     database: 'inter_tand',
     waitForConnections: true,
     connectionLimit: 10,
@@ -567,8 +574,14 @@ async function startServer() {
     try {
         const connection = await pool.getConnection();
         connection.release();
+        
+        // Inicializar servicios de Interledger
+        await automationService.initialize();
+        automationService.scheduleAutomaticChecks();
+        
         app.listen(PORT, () => {
             console.log(`InterTand ejecutándose en http://localhost:${PORT}`);
+            console.log('🚀 Servicios de Interledger inicializados correctamente');
         });
     } catch (error) {
         console.error('Error conectando a MySQL:', error.message);

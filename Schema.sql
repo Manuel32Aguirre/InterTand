@@ -3,18 +3,18 @@
 CREATE DATABASE IF NOT EXISTS inter_tand;
 USE inter_tand;
 
--- Tabla de usuarios (con contraseña, turno y saldo)
+-- Tabla de usuarios (con contraseña, turno y wallet address)
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     turno INT NOT NULL DEFAULT 0,
-    saldo DECIMAL(10,2) DEFAULT 10000.00,
+    wallet_address VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabla de tandas (con current_turn y current_amount)
+-- Tabla de tandas (con current_turn, current_amount y status)
 CREATE TABLE tandas (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -23,18 +23,21 @@ CREATE TABLE tandas (
     max_participants INT NOT NULL,
     current_turn INT DEFAULT 1,
     period ENUM('semanal', 'quincenal', 'mensual') NOT NULL DEFAULT 'mensual',
+    status ENUM('active', 'completed', 'cancelled') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabla de pagos (historial simple)
+-- Tabla de pagos (historial con interledger_payment_id y updated_at)
 CREATE TABLE payments (
     id INT AUTO_INCREMENT PRIMARY KEY,
     tanda_id INT,
     user_id INT,
     amount DECIMAL(10,2) NOT NULL,
     type ENUM('contribution', 'payout') NOT NULL,
-    status ENUM('pending', 'completed', 'failed') DEFAULT 'pending',
+    status ENUM('pending', 'processing', 'completed', 'failed') DEFAULT 'pending',
+    interledger_payment_id VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (tanda_id) REFERENCES tandas(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );

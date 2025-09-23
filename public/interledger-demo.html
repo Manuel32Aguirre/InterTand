@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InterTand - Demo Interledger</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .section h2 {
+            color: white;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: white;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 16px;
+        }
+
+        input::placeholder, textarea::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: #4ade80;
+            border-color: #4ade80;
+        }
+
+        .btn-secondary {
+            background: #06b6d4;
+            border-color: #06b6d4;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .status.success {
+            background: rgba(74, 222, 128, 0.2);
+            border: 1px solid #4ade80;
+            color: #4ade80;
+        }
+
+        .status.error {
+            background: rgba(248, 113, 113, 0.2);
+            border: 1px solid #f87171;
+            color: #f87171;
+        }
+
+        .status.info {
+            background: rgba(96, 165, 250, 0.2);
+            border: 1px solid #60a5fa;
+            color: #60a5fa;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                margin: 10px;
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+        }
+
+        .wallet-info {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .wallet-info h3 {
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .wallet-info p {
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 5px;
+        }
+
+        .examples {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .examples h4 {
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .examples ul {
+            color: rgba(255, 255, 255, 0.8);
+            padding-left: 20px;
+        }
+
+        .examples li {
+            margin-bottom: 5px;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .examples li:hover {
+            color: #4ade80;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 InterTand - Demo Interledger</h1>
+        
+        <!-- Sección 1: Validar Wallet -->
+        <div class="section">
+            <h2>1. 🔍 Validar Wallet Address</h2>
+            
+            <div class="examples">
+                <h4>Ejemplos de Wallet URLs:</h4>
+                <ul>
+                    <li onclick="setWalletExample('https://ilp.interledger-test.dev/alice')">🧪 Alice (Test)</li>
+                    <li onclick="setWalletExample('https://ilp.interledger-test.dev/bob')">🧪 Bob (Test)</li>
+                    <li onclick="setWalletExample('https://cloud-nine-wallet.com/alice')">☁️ Cloud Nine Wallet</li>
+                    <li onclick="setWalletExample('https://happy-life-bank.com/shoe-shop')">🏪 Happy Life Bank</li>
+                </ul>
+            </div>
+
+            <div class="form-group">
+                <label for="walletUrl">Wallet Address URL:</label>
+                <input type="url" id="walletUrl" placeholder="https://ilp.interledger-test.dev/alice" required>
+            </div>
+            
+            <button onclick="validateWallet()" class="btn-secondary">🔍 Validar Wallet</button>
+            <button onclick="getWalletInfo()" class="btn-secondary">ℹ️ Obtener Info</button>
+            
+            <div id="walletStatus"></div>
+            <div id="walletInfo"></div>
+        </div>
+
+        <!-- Sección 2: Contribución a Tanda -->
+        <div class="section">
+            <h2>2. 💰 Contribuir a Tanda</h2>
+            
+            <div class="grid">
+                <div>
+                    <div class="form-group">
+                        <label for="tandaId">ID de Tanda:</label>
+                        <input type="number" id="tandaId" placeholder="1" value="1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="userId">ID de Usuario:</label>
+                        <input type="number" id="userId" placeholder="1" value="1" required>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="form-group">
+                        <label for="amount">Monto (USD):</label>
+                        <input type="number" id="amount" step="0.01" placeholder="100.00" value="100.00" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="senderWallet">Wallet del Emisor:</label>
+                        <input type="url" id="senderWallet" placeholder="https://ilp.interledger-test.dev/alice" required>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="receiverWallet">Wallet del Receptor:</label>
+                <input type="url" id="receiverWallet" placeholder="https://ilp.interledger-test.dev/bob" required>
+            </div>
+            
+            <button onclick="contributeToTanda()" class="btn-primary">🚀 Iniciar Contribución</button>
+            
+            <div id="contributionStatus"></div>
+        </div>
+
+        <!-- Sección 3: Estado de Tanda -->
+        <div class="section">
+            <h2>3. 📊 Estado de Tanda</h2>
+            
+            <div class="form-group">
+                <label for="statusTandaId">ID de Tanda a consultar:</label>
+                <input type="number" id="statusTandaId" placeholder="1" value="1" required>
+            </div>
+            
+            <button onclick="getTandaStatus()" class="btn-secondary">📊 Obtener Estado</button>
+            <button onclick="getPaymentHistory()" class="btn-secondary">📋 Ver Historial</button>
+            
+            <div id="tandaStatusResult"></div>
+        </div>
+
+        <!-- Sección 4: Configuración de Usuario -->
+        <div class="section">
+            <h2>4. ⚙️ Configuración de Usuario</h2>
+            
+            <div class="form-group">
+                <label for="configUserId">ID de Usuario:</label>
+                <input type="number" id="configUserId" placeholder="1" value="1" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="userWalletAddress">Nueva Wallet Address:</label>
+                <input type="url" id="userWalletAddress" placeholder="https://ilp.interledger-test.dev/alice" required>
+            </div>
+            
+            <button onclick="updateUserWallet()" class="btn-secondary">💾 Actualizar Wallet</button>
+            
+            <div id="userConfigStatus"></div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let currentPaymentData = null;
+
+        // Función para establecer ejemplos de wallet
+        function setWalletExample(url) {
+            document.getElementById('walletUrl').value = url;
+            if (!document.getElementById('senderWallet').value) {
+                document.getElementById('senderWallet').value = url;
+            }
+        }
+
+        // Validar wallet address
+        async function validateWallet() {
+            const walletUrl = document.getElementById('walletUrl').value;
+            
+            if (!walletUrl) {
+                showStatus('walletStatus', 'Por favor ingresa una wallet URL', 'error');
+                return;
+            }
+
+            showStatus('walletStatus', 'Validando wallet...', 'info');
+
+            try {
+                const response = await fetch('/api/interledger/validate-wallet', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ walletUrl })
+                });
+
+                const result = await response.json();
+
+                if (result.success && result.validation.isValid) {
+                    showStatus('walletStatus', `✅ Wallet válida!\nNombre: ${result.validation.walletAddress.publicName || 'N/A'}\nAsset: ${result.validation.walletAddress.assetCode}\nEscala: ${result.validation.walletAddress.assetScale}`, 'success');
+                    
+                    // Mostrar información detallada
+                    showWalletInfo(result.validation.walletAddress);
+                } else {
+                    showStatus('walletStatus', `❌ Wallet inválida: ${result.validation?.error || result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus('walletStatus', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Obtener información de wallet
+        async function getWalletInfo() {
+            const walletUrl = document.getElementById('walletUrl').value;
+            
+            if (!walletUrl) {
+                showStatus('walletStatus', 'Por favor ingresa una wallet URL', 'error');
+                return;
+            }
+
+            showStatus('walletStatus', 'Obteniendo información de wallet...', 'info');
+
+            try {
+                const encodedUrl = encodeURIComponent(walletUrl);
+                const response = await fetch(`/api/interledger/wallet-info/${encodedUrl}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus('walletStatus', '✅ Información obtenida', 'success');
+                    showWalletInfo(result.walletInfo);
+                } else {
+                    showStatus('walletStatus', `❌ Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus('walletStatus', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Mostrar información de wallet
+        function showWalletInfo(walletData) {
+            const walletInfoHtml = `
+                <div class="wallet-info">
+                    <h3>Información de Wallet</h3>
+                    <p><strong>ID:</strong> ${walletData.id}</p>
+                    <p><strong>Nombre Público:</strong> ${walletData.publicName || 'N/A'}</p>
+                    <p><strong>Activo:</strong> ${walletData.assetCode}</p>
+                    <p><strong>Escala:</strong> ${walletData.assetScale}</p>
+                    <p><strong>Servidor de Auth:</strong> ${walletData.authServer}</p>
+                    <p><strong>Servidor de Recursos:</strong> ${walletData.resourceServer}</p>
+                </div>
+            `;
+            document.getElementById('walletInfo').innerHTML = walletInfoHtml;
+        }
+
+        // Contribuir a tanda
+        async function contributeToTanda() {
+            const tandaId = document.getElementById('tandaId').value;
+            const userId = document.getElementById('userId').value;
+            const senderWallet = document.getElementById('senderWallet').value;
+            const amount = document.getElementById('amount').value;
+
+            if (!tandaId || !userId || !senderWallet || !amount) {
+                showStatus('contributionStatus', 'Por favor completa todos los campos', 'error');
+                return;
+            }
+
+            showStatus('contributionStatus', 'Iniciando contribución...', 'info');
+
+            try {
+                const response = await fetch('/api/interledger/contribute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tandaId: parseInt(tandaId),
+                        userId: parseInt(userId),
+                        senderWalletUrl: senderWallet,
+                        amount: parseFloat(amount)
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentPaymentData = result.paymentData;
+                    showStatus('contributionStatus', `✅ Contribución iniciada!\nPago ID: ${result.paymentId}\n\n🔗 Redirigiendo para autorización...`, 'success');
+                    
+                    // Abrir popup para autorización
+                    setTimeout(() => {
+                        const popup = window.open(result.interactUrl, 'payment_auth', 'width=600,height=800,scrollbars=yes,resizable=yes');
+                        
+                        // Escuchar el resultado
+                        window.addEventListener('message', handlePaymentResult);
+                    }, 2000);
+                    
+                } else {
+                    showStatus('contributionStatus', `❌ Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus('contributionStatus', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Manejar resultado del pago
+        function handlePaymentResult(event) {
+            if (event.data.type === 'payment_result') {
+                if (event.data.result === 'grant_accepted') {
+                    showStatus('contributionStatus', `✅ ¡Pago autorizado correctamente!\nReferencia: ${event.data.interactRef}\nTanda: ${event.data.tandaId}\nPago: ${event.data.paymentId}`, 'success');
+                } else {
+                    showStatus('contributionStatus', `❌ Pago cancelado o rechazado\nReferencia: ${event.data.interactRef}`, 'error');
+                }
+            }
+        }
+
+        // Obtener estado de tanda
+        async function getTandaStatus() {
+            const tandaId = document.getElementById('statusTandaId').value;
+            
+            if (!tandaId) {
+                showStatus('tandaStatusResult', 'Por favor ingresa un ID de tanda', 'error');
+                return;
+            }
+
+            showStatus('tandaStatusResult', 'Obteniendo estado de tanda...', 'info');
+
+            try {
+                const response = await fetch(`/api/interledger/tanda/${tandaId}/status`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const statusText = `✅ Estado de Tanda ${tandaId}:
+Nombre: ${result.data.tanda?.name || 'N/A'}
+Monto Total: $${result.data.tanda?.total_amount || 'N/A'}
+Monto Actual: $${result.data.currentAmount || 'N/A'}
+Monto Esperado: $${result.data.expectedAmount || 'N/A'}
+Turno Actual: ${result.data.tanda?.current_turn || 'N/A'}
+Participantes: ${result.data.participants?.length || 0}
+Receptor Actual: ${result.data.currentReceiver?.name || 'N/A'}
+Listo para Pago: ${result.data.readyForPayout ? 'Sí' : 'No'}`;
+
+                    showStatus('tandaStatusResult', statusText, 'success');
+                } else {
+                    showStatus('tandaStatusResult', `❌ Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus('tandaStatusResult', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Obtener historial de pagos
+        async function getPaymentHistory() {
+            const tandaId = document.getElementById('statusTandaId').value;
+            
+            if (!tandaId) {
+                showStatus('tandaStatusResult', 'Por favor ingresa un ID de tanda', 'error');
+                return;
+            }
+
+            showStatus('tandaStatusResult', 'Obteniendo historial de pagos...', 'info');
+
+            try {
+                const response = await fetch(`/api/interledger/tanda/${tandaId}/history`);
+                const result = await response.json();
+
+                if (result.success) {
+                    let historyText = `📋 Historial de Pagos - Tanda ${tandaId}:\n\n`;
+                    
+                    if (result.data.length === 0) {
+                        historyText += 'No hay pagos registrados.';
+                    } else {
+                        result.data.forEach((payment, index) => {
+                            historyText += `${index + 1}. ${payment.name} - $${payment.amount} (${payment.type}) - ${payment.status}\n   ${payment.created_at}\n\n`;
+                        });
+                    }
+
+                    showStatus('tandaStatusResult', historyText, 'info');
+                } else {
+                    showStatus('tandaStatusResult', `❌ Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus('tandaStatusResult', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Actualizar wallet de usuario
+        async function updateUserWallet() {
+            const userId = document.getElementById('configUserId').value;
+            const walletAddress = document.getElementById('userWalletAddress').value;
+            
+            if (!userId || !walletAddress) {
+                showStatus('userConfigStatus', 'Por favor completa todos los campos', 'error');
+                return;
+            }
+
+            showStatus('userConfigStatus', 'Actualizando wallet address...', 'info');
+
+            try {
+                const response = await fetch(`/api/interledger/user/${userId}/wallet`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ walletAddress })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus('userConfigStatus', `✅ Wallet address actualizada correctamente para usuario ${userId}`, 'success');
+                } else {
+                    showStatus('userConfigStatus', `❌ Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus('userConfigStatus', `❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Función helper para mostrar estados
+        function showStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            // Establecer valores por defecto
+            document.getElementById('senderWallet').value = 'https://ilp.interledger-test.dev/alice';
+            document.getElementById('receiverWallet').value = 'https://ilp.interledger-test.dev/bob';
+            document.getElementById('walletUrl').value = 'https://ilp.interledger-test.dev/alice';
+            document.getElementById('userWalletAddress').value = 'https://ilp.interledger-test.dev/alice';
+        });
+    </script>
+</body>
+</html>
