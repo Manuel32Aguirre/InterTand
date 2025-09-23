@@ -3,13 +3,14 @@
 CREATE DATABASE IF NOT EXISTS inter_tand;
 USE inter_tand;
 
--- Tabla de usuarios (con contraseña y turno)
+-- Tabla de usuarios (con contraseña, turno y saldo)
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     turno INT NOT NULL DEFAULT 0,
+    saldo DECIMAL(10,2) DEFAULT 1000.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

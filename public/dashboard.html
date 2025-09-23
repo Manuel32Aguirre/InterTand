@@ -28,7 +28,7 @@
                 <p class="text-3xl font-bold text-purple-600" id="miTurno">-</p>
             </div>
             <div class="bg-white p-6 rounded shadow">
-                <h3 class="text-lg font-semibold text-gray-700">Total</h3>
+                <h3 class="text-lg font-semibold text-gray-700">Mi Saldo</h3>
                 <p class="text-3xl font-bold text-green-600" id="totalInvertido">$0</p>
             </div>
             <div class="bg-white p-6 rounded shadow">
@@ -93,6 +93,50 @@
 
     <div id="message" class="hidden fixed top-4 right-4 p-4 rounded shadow-lg z-50"></div>
 
+    <!-- Modal para seleccionar turno -->
+    <div id="turnModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Selecciona tu turno</h3>
+                <div class="mt-2 px-7 py-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Turnos disponibles:</label>
+                    <select id="modalTurnSelect" class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Seleccionar turno</option>
+                    </select>
+                    <p class="text-sm text-gray-500 mt-2">Una vez seleccionado, no podrás cambiarlo</p>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="confirmTurnBtn" onclick="confirmTurnSelection()" 
+                            class="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 mr-2">
+                        Confirmar
+                    </button>
+                    <button onclick="closeTurnModal()" 
+                            class="px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para ver participantes -->
+    <div id="participantsModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-gray-900 text-center mb-4">Participantes de la Tanda</h3>
+                <div id="participantsList" class="max-h-64 overflow-y-auto space-y-2">
+                    <!-- Participants will be populated dynamically -->
+                </div>
+                <div class="text-center mt-4">
+                    <button onclick="closeParticipantsModal()" 
+                            class="px-4 py-2 bg-gray-300 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentUser = null;
         let tandas = [];
@@ -117,6 +161,9 @@
             localStorage.removeItem('user');
             window.location.href = '/';
         }
+
+        // Variables globales para el modal
+        let currentTandaId = null;
 
         function showMessage(text, type = 'success') {
             const messageDiv = document.getElementById('message');
@@ -157,7 +204,7 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    showMessage('Tanda creada exitosamente');
+                    showMessage(data.message);
                     document.getElementById('tandaName').value = '';
                     document.getElementById('totalAmount').value = '';
                     document.getElementById('maxParticipants').value = '';
@@ -183,10 +230,21 @@
                 if (tandas.length === 0) {
                     container.innerHTML = '<div class="p-6 text-gray-500 text-center">No hay tandas disponibles</div>';
                 } else {
-                    container.innerHTML = tandas.map(tanda => {
-                        // Verificar si el usuario actual es el del turno
+                    // Verificar participación del usuario en cada tanda
+                    const tandasWithStatus = await Promise.all(tandas.map(async (tanda) => {
+                        try {
+                            const statusResponse = await fetch(`/api/tandas/${tanda.id}/user-status/${currentUser.id}`);
+                            const statusData = await statusResponse.json();
+                            return { ...tanda, userStatus: statusData };
+                        } catch (error) {
+                            return { ...tanda, userStatus: { isParticipant: false, turnOrder: null } };
+                        }
+                    }));
+                    
+                    container.innerHTML = tandasWithStatus.map(tanda => {
                         const isCurrentTurn = currentUser.id === tanda.current_user_id;
                         const montoIndividual = tanda.total_amount / tanda.max_participants;
+                        const isParticipant = tanda.userStatus.isParticipant;
                         
                         return `
                         <div class="p-6">
@@ -200,6 +258,7 @@
                                         <p class="text-sm">Pago ${tanda.period}: $${montoIndividual.toLocaleString()}</p>
                                         <p class="text-sm">Turno actual: ${tanda.current_turn} ${tanda.current_user_name ? `(${tanda.current_user_name})` : ''}</p>
                                         <p class="text-sm">Periodo: <span class="capitalize">${tanda.period}</span></p>
+                                        ${isParticipant ? `<p class="text-sm font-bold text-blue-600">✅ Participas - Turno ${tanda.userStatus.turnOrder}</p>` : ''}
                                         ${isCurrentTurn ? '<p class="text-sm font-bold text-green-600">🎉 ¡Es tu turno de recibir!</p>' : ''}
                                         <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
                                             <div class="bg-blue-600 h-2 rounded-full" 
@@ -208,18 +267,27 @@
                                     </div>
                                 </div>
                                 <div class="ml-4 space-y-2">
-                                    <button onclick="joinTanda(${tanda.id})" 
-                                            class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 block w-full">
-                                        Unirse
-                                    </button>
-                                    ${isCurrentTurn ? 
-                                        '<button disabled class="bg-gray-400 text-white px-3 py-1 rounded text-sm block w-full cursor-not-allowed">Tu turno - No puedes pagar</button>' :
-                                        `<button onclick="createPayment(${tanda.id}, ${montoIndividual})" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 block w-full">Pagar $${montoIndividual.toLocaleString()}</button>`
+                                    ${!isParticipant ? 
+                                        `<button onclick="openTurnModal(${tanda.id})" 
+                                                class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 block w-full">
+                                            Unirse
+                                        </button>` :
+                                        '<button disabled class="bg-gray-400 text-white px-3 py-1 rounded text-sm block w-full cursor-not-allowed">Ya participas</button>'
                                     }
-                                    <button onclick="viewParticipants(${tanda.id})" 
-                                            class="bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700 block w-full">
-                                        Ver
-                                    </button>
+                                    ${!isParticipant ?
+                                        '<button disabled class="bg-gray-300 text-gray-500 px-3 py-1 rounded text-sm block w-full cursor-not-allowed">Pagar</button>' :
+                                        (isCurrentTurn ? 
+                                            '<button disabled class="bg-gray-400 text-white px-3 py-1 rounded text-sm block w-full cursor-not-allowed">Tu turno - No puedes pagar</button>' :
+                                            `<button onclick="createPayment(${tanda.id}, ${montoIndividual})" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 block w-full">Pagar $${montoIndividual.toLocaleString()}</button>`
+                                        )
+                                    }
+                                    ${!isParticipant ?
+                                        '<button disabled class="bg-gray-300 text-gray-500 px-3 py-1 rounded text-sm block w-full cursor-not-allowed">Ver</button>' :
+                                        `<button onclick="viewParticipants(${tanda.id})" 
+                                                class="bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700 block w-full">
+                                            Ver
+                                        </button>`
+                                    }
                                 </div>
                             </div>
                         </div>
@@ -240,10 +308,12 @@
                 const pendingCount = payments.filter(p => p.status === 'pending').length;
                 document.getElementById('pagosPendientes').textContent = pendingCount;
                 
-                const totalAmount = payments
-                    .filter(p => p.status === 'completed')
-                    .reduce((sum, p) => sum + p.amount, 0);
-                document.getElementById('totalInvertido').textContent = `$${totalAmount.toLocaleString()}`;
+                // Mostrar el saldo del usuario actual
+                if (currentUser && currentUser.saldo !== undefined) {
+                    document.getElementById('totalInvertido').textContent = `$${currentUser.saldo.toLocaleString()}`;
+                } else {
+                    document.getElementById('totalInvertido').textContent = '$0';
+                }
                 
                 const container = document.getElementById('paymentsList');
                 if (payments.length === 0) {
@@ -308,15 +378,58 @@
             }
         }
 
-        async function joinTanda(tandaId) {
-            if (!confirm('¿Deseas unirte a esta tanda?')) return;
+        async function openTurnModal(tandaId) {
+            currentTandaId = tandaId;
             
             try {
-                const response = await fetch(`/api/tandas/${tandaId}/join`, {
+                // Obtener turnos disponibles
+                const response = await fetch(`/api/tandas/${tandaId}/available-turns`);
+                const data = await response.json();
+                
+                if (data.availableTurns.length === 0) {
+                    showMessage('No hay turnos disponibles en esta tanda', 'error');
+                    return;
+                }
+                
+                // Llenar el combobox con turnos disponibles
+                const select = document.getElementById('modalTurnSelect');
+                select.innerHTML = '<option value="">Seleccionar turno</option>';
+                
+                data.availableTurns.forEach(turn => {
+                    const option = document.createElement('option');
+                    option.value = turn;
+                    option.textContent = `Turno ${turn}`;
+                    select.appendChild(option);
+                });
+                
+                // Mostrar el modal
+                document.getElementById('turnModal').classList.remove('hidden');
+            } catch (error) {
+                showMessage('Error obteniendo turnos disponibles', 'error');
+            }
+        }
+
+        function closeTurnModal() {
+            document.getElementById('turnModal').classList.add('hidden');
+            document.getElementById('modalTurnSelect').value = '';
+            currentTandaId = null;
+        }
+
+        async function confirmTurnSelection() {
+            const selectedTurn = parseInt(document.getElementById('modalTurnSelect').value);
+            
+            if (!selectedTurn) {
+                showMessage('Por favor selecciona un turno', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/tandas/${currentTandaId}/join`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        user_id: currentUser.id
+                        user_id: currentUser.id,
+                        selected_turn: selectedTurn
                     })
                 });
                 
@@ -328,6 +441,7 @@
                     currentUser.turno = data.turnOrder;
                     localStorage.setItem('user', JSON.stringify(currentUser));
                     document.getElementById('miTurno').textContent = data.turnOrder;
+                    closeTurnModal();
                     loadTandas();
                 } else {
                     showMessage(data.error || 'Error al unirse a la tanda', 'error');
@@ -337,21 +451,59 @@
             }
         }
 
+        // Función legacy - ya no se usa directamente, ahora se usa openTurnModal
+        async function joinTanda(tandaId) {
+            openTurnModal(tandaId);
+        }
+
         async function viewParticipants(tandaId) {
             try {
-                const response = await fetch(`/api/tandas/${tandaId}/participants`);
-                const data = await response.json();
+                const [participantsResponse, turnsResponse] = await Promise.all([
+                    fetch(`/api/tandas/${tandaId}/participants`),
+                    fetch(`/api/tandas/${tandaId}/available-turns`)
+                ]);
                 
-                if (data.participants) {
-                    const participantsList = data.participants.map(p => 
-                        `${p.turn_order}. ${p.name} ${p.has_received ? '✅' : '⏳'}`
-                    ).join('\\n');
+                const participantsData = await participantsResponse.json();
+                const turnsData = await turnsResponse.json();
+                
+                if (participantsData.participants && turnsData) {
+                    const participantsList = document.getElementById('participantsList');
                     
-                    alert(`Participantes de la tanda:\\n\\n${participantsList}`);
+                    // Crear HTML para participantes
+                    let participantsHTML = participantsData.participants.map(p => 
+                        `<div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                            <span class="font-medium">Turno ${p.turn_order}: ${p.name}</span>
+                            <span class="text-sm ${p.has_received ? 'text-green-600' : 'text-orange-600'}">
+                                ${p.has_received ? '✅ Cobrado' : '⏳ Pendiente'}
+                            </span>
+                        </div>`
+                    ).join('');
+                    
+                    // Agregar turnos disponibles si los hay
+                    if (turnsData.availableTurns.length > 0) {
+                        participantsHTML += `
+                            <div class="mt-4 p-2 bg-blue-50 rounded">
+                                <h4 class="font-medium text-blue-800 mb-2">Turnos Disponibles:</h4>
+                                <div class="flex flex-wrap gap-1">
+                                    ${turnsData.availableTurns.map(turn => 
+                                        `<span class="bg-blue-200 text-blue-800 px-2 py-1 rounded text-sm">${turn}</span>`
+                                    ).join('')}
+                                </div>
+                            </div>`;
+                    }
+                    
+                    participantsList.innerHTML = participantsHTML;
+                    document.getElementById('participantsModal').classList.remove('hidden');
+                } else {
+                    showMessage('Error obteniendo información de la tanda', 'error');
                 }
             } catch (error) {
                 showMessage('Error obteniendo participantes', 'error');
             }
+        }
+
+        function closeParticipantsModal() {
+            document.getElementById('participantsModal').classList.add('hidden');
         }
     </script>
 </body>

@@ -65,6 +65,7 @@ app.get('/api/setup-db', async (req, res) => {
                 email VARCHAR(100) UNIQUE NOT NULL,
                 password VARCHAR(255) NOT NULL,
                 turno INT NOT NULL DEFAULT 0,
+                saldo DECIMAL(10,2) DEFAULT 1000.00,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
@@ -146,24 +147,26 @@ app.post('/api/register', async (req, res) => {
         console.log('Datos recibidos en registro:', req.body);
         const { name, email, password } = req.body;
         
-        // Validar que la contraseña tenga al menos 6 caracteres
-        if (!password || password.length < 6) {
-            return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+        // Validar que la contraseña tenga entre 6 y 20 caracteres
+        if (!password || password.length < 6 || password.length > 20) {
+            return res.status(400).json({ error: 'La contraseña debe tener entre 6 y 20 caracteres' });
         }
         
         // Hash de la contraseña
         const hashedPassword = await bcrypt.hash(password, 10);
         
+        // Registrar usuario con saldo inicial de 1000
         const [result] = await pool.execute(
-            'INSERT INTO users (name, email, password) VALUES (?, ?, ?)', 
-            [name, email, hashedPassword]
+            'INSERT INTO users (name, email, password, saldo) VALUES (?, ?, ?, ?)', 
+            [name, email, hashedPassword, 1000.00]
         );
         
         console.log('Usuario registrado exitosamente:', result.insertId);
         res.json({ 
             success: true, 
             userId: result.insertId,
-            message: 'Usuario registrado exitosamente' 
+            saldo: 1000.00,
+            message: 'Usuario registrado exitosamente con saldo inicial de $1,000' 
         });
     } catch (error) {
         console.error('Error en registro:', error);
@@ -177,6 +180,11 @@ app.post('/api/login', async (req, res) => {
         
         if (!email || !password) {
             return res.status(400).json({ error: 'Email y contraseña son requeridos' });
+        }
+        
+        // Validar longitud de contraseña
+        if (password.length > 20) {
+            return res.status(400).json({ error: 'Contraseña demasiado larga (máximo 20 caracteres)' });
         }
         
         const [rows] = await pool.execute(
@@ -198,7 +206,7 @@ app.post('/api/login', async (req, res) => {
         
         res.json({ 
             success: true,
-            user: { id: user.id, name: user.name, email: user.email, turno: user.turno }
+            user: { id: user.id, name: user.name, email: user.email, turno: user.turno, saldo: user.saldo }
         });
     } catch (error) {
         console.error('Error en login:', error);
@@ -224,13 +232,74 @@ app.get('/api/tandas', async (req, res) => {
     }
 });
 
+app.get('/api/tandas/:id/user-status/:userId', async (req, res) => {
+    try {
+        const { id: tanda_id, userId: user_id } = req.params;
+        
+        const [participation] = await pool.execute(
+            'SELECT turn_order FROM tanda_participants WHERE tanda_id = ? AND user_id = ?',
+            [tanda_id, user_id]
+        );
+        
+        res.json({
+            isParticipant: participation.length > 0,
+            turnOrder: participation.length > 0 ? participation[0].turn_order : null
+        });
+    } catch (error) {
+        console.error('Error verificando estado del usuario:', error);
+        res.status(500).json({ error: 'Error verificando estado del usuario' });
+    }
+});
+
+app.get('/api/tandas/:id/available-turns', async (req, res) => {
+    try {
+        const { id: tanda_id } = req.params;
+        
+        // Obtener información de la tanda
+        const [tandaInfo] = await pool.execute(
+            'SELECT max_participants FROM tandas WHERE id = ?',
+            [tanda_id]
+        );
+        
+        if (tandaInfo.length === 0) {
+            return res.status(404).json({ error: 'Tanda no encontrada' });
+        }
+        
+        // Obtener turnos ocupados
+        const [occupiedTurns] = await pool.execute(
+            'SELECT turn_order FROM tanda_participants WHERE tanda_id = ?',
+            [tanda_id]
+        );
+        
+        const occupied = occupiedTurns.map(row => row.turn_order);
+        const maxParticipants = tandaInfo[0].max_participants;
+        
+        // Generar lista de turnos disponibles
+        const availableTurns = [];
+        for (let i = 1; i <= maxParticipants; i++) {
+            if (!occupied.includes(i)) {
+                availableTurns.push(i);
+            }
+        }
+        
+        res.json({ 
+            availableTurns,
+            occupiedTurns: occupied,
+            maxParticipants
+        });
+    } catch (error) {
+        console.error('Error obteniendo turnos disponibles:', error);
+        res.status(500).json({ error: 'Error obteniendo turnos disponibles' });
+    }
+});
+
 app.post('/api/tandas/:id/join', async (req, res) => {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
         
         const { id: tanda_id } = req.params;
-        const { user_id } = req.body;
+        const { user_id, selected_turn } = req.body;
         
         // Verificar que la tanda existe y no esté llena
         const [tandaInfo] = await connection.execute(
@@ -240,6 +309,21 @@ app.post('/api/tandas/:id/join', async (req, res) => {
         
         if (tandaInfo.length === 0) {
             return res.status(404).json({ error: 'Tanda no encontrada' });
+        }
+        
+        // Validar que el turno seleccionado es válido
+        if (!selected_turn || selected_turn < 1 || selected_turn > tandaInfo[0].max_participants) {
+            return res.status(400).json({ error: 'Turno seleccionado no es válido' });
+        }
+        
+        // Verificar que el turno esté disponible
+        const [turnCheck] = await connection.execute(
+            'SELECT id FROM tanda_participants WHERE tanda_id = ? AND turn_order = ?',
+            [tanda_id, selected_turn]
+        );
+        
+        if (turnCheck.length > 0) {
+            return res.status(400).json({ error: 'El turno seleccionado ya está ocupado' });
         }
         
         // Contar participantes actuales
@@ -262,26 +346,23 @@ app.post('/api/tandas/:id/join', async (req, res) => {
             return res.status(400).json({ error: 'Ya estás participando en esta tanda' });
         }
         
-        // Asignar el siguiente turno disponible
-        const nextTurnOrder = participantCount[0].count + 1;
-        
-        // Agregar participante
+        // Agregar participante con el turno seleccionado
         await connection.execute(
             'INSERT INTO tanda_participants (tanda_id, user_id, turn_order) VALUES (?, ?, ?)',
-            [tanda_id, user_id, nextTurnOrder]
+            [tanda_id, user_id, selected_turn]
         );
         
         // Actualizar el turno del usuario
         await connection.execute(
             'UPDATE users SET turno = ? WHERE id = ?',
-            [nextTurnOrder, user_id]
+            [selected_turn, user_id]
         );
         
         await connection.commit();
         res.json({
             success: true,
             message: 'Te has unido a la tanda exitosamente',
-            turnOrder: nextTurnOrder
+            turnOrder: selected_turn
         });
     } catch (error) {
         await connection.rollback();
@@ -318,14 +399,16 @@ app.post('/api/tandas', async (req, res) => {
             return res.status(400).json({ error: 'Periodo debe ser: semanal, quincenal o mensual' });
         }
         
+        // Crear la tanda sin asignar participantes
         const [result] = await pool.execute(
             'INSERT INTO tandas (name, total_amount, max_participants, period) VALUES (?, ?, ?, ?)',
             [name, total_amount, max_participants, period]
         );
+        
         res.json({ 
             success: true, 
             tandaId: result.insertId,
-            message: 'Tanda creada exitosamente' 
+            message: 'Tanda creada exitosamente. Ahora puedes unirte y seleccionar tu turno.'
         });
     } catch (error) {
         console.error('Error creando tanda:', error);

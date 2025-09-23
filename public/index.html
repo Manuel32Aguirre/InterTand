@@ -28,9 +28,9 @@
                 </div>
                 <div class="mb-4">
                     <label class="block text-gray-700 text-sm font-medium mb-2">Contraseña</label>
-                    <input type="password" id="password" required minlength="6"
+                    <input type="password" id="password" required minlength="6" maxlength="20"
                            class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <p class="text-xs text-gray-500 mt-1">Mínimo 6 caracteres</p>
+                    <p class="text-xs text-gray-500 mt-1">Entre 6 y 20 caracteres</p>
                 </div>
                 <button type="submit" 
                         class="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
@@ -55,7 +55,7 @@
                 </div>
                 <div class="mb-4">
                     <label class="block text-gray-700 text-sm font-medium mb-2">Contraseña</label>
-                    <input type="password" id="loginPassword" required 
+                    <input type="password" id="loginPassword" required maxlength="20"
                            class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 <button type="submit" 
@@ -103,8 +103,8 @@
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             
-            if (password.length < 6) {
-                showMessage('La contraseña debe tener al menos 6 caracteres', 'error');
+            if (password.length < 6 || password.length > 20) {
+                showMessage('La contraseña debe tener entre 6 y 20 caracteres', 'error');
                 return;
             }
             
@@ -118,8 +118,13 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    showMessage('Registro exitoso');
-                    localStorage.setItem('user', JSON.stringify({ id: data.userId, name, email }));
+                    showMessage(data.message);
+                    localStorage.setItem('user', JSON.stringify({ 
+                        id: data.userId, 
+                        name, 
+                        email, 
+                        saldo: data.saldo || 1000 
+                    }));
                     setTimeout(() => {
                         window.location.href = '/dashboard';
                     }, 1500);
@@ -136,6 +141,11 @@
             
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
+            
+            if (password.length < 6 || password.length > 20) {
+                showMessage('La contraseña debe tener entre 6 y 20 caracteres', 'error');
+                return;
+            }
             
             try {
                 const response = await fetch('/api/login', {
