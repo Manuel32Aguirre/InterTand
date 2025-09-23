@@ -367,9 +367,16 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    showMessage('Pago registrado exitosamente');
-                    loadPayments();
-                    loadTandas(); // Recargar para ver el progreso actualizado
+                    // Si hay información de Interledger con redirección
+                    if (data.interledger && data.interledger.interactionUrl) {
+                        // Redirigir al usuario para confirmar el pago
+                        window.location.href = data.interledger.interactionUrl;
+                    } else {
+                        // Pago normal sin Interledger
+                        showMessage('Pago registrado exitosamente');
+                        loadPayments();
+                        loadTandas(); // Recargar para ver el progreso actualizado
+                    }
                 } else {
                     showMessage(data.error || 'Error al registrar pago', 'error');
                 }

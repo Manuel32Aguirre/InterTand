@@ -1,13 +1,8 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const path = require('path');
-const bcrypt = require('bcrypt');
-const { createAuthenticatedClient } = require('@interledger/open-payments');
-const fs = require('fs');
-
-// Importar servicios y rutas de Interledger
-const automationService = require('./server/services/automationService');
-const interledgerRoutes = require('./routes/interledger');
+const interledgerService = require('./services/interledgerService');
+require('dotenv').config();
 
 const app = express();
 const PORT = 3001;
@@ -15,15 +10,13 @@ const PORT = 3001;
 app.use(express.json());
 app.use(express.static('public'));
 
-// Rutas de Interledger
-app.use('/api/interledger', interledgerRoutes);
-
+// Configuración de base de datos usando variables de entorno
 const dbConfig = {
-    host: 'localhost',
-    port: 3306,
-    user: 'root',
-    password: 'Cuatecon23+',
-    database: 'inter_tand',
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 3307,
+    user: process.env.DB_USER || 'manuel',
+    password: process.env.DB_PASSWORD || '1234',
+    database: process.env.DB_NAME || 'inter_tand',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
@@ -31,35 +24,38 @@ const dbConfig = {
 
 const pool = mysql.createPool(dbConfig);
 
-// Configuración inicial
-async function setupInterledgerClient() {
+// Configuración inicial con Interledger
+async function setupServer() {
     try {
-        const privateKeyPath = './private-key.pem';
+        console.log('🔧 Iniciando servidor con integración Interledger...');
         
-        // a. Importar dependencias y configurar el cliente
-        // async () => {
-        const client = await createAuthenticatedClient({
-            walletAddressUrl: '',
-            privateKey: privateKeyPath,
-            keyId: ''
-        });
+        // Inicializar servicio de Interledger
+        const interledgerReady = await interledgerService.initialize();
         
-        // b. Crear una instancia del cliente Open Payments
-        // c. Cargar la clave privada del archivo
-        // d. Configurar las direcciones de las billeteras del remitente y el receptor
+        if (interledgerReady) {
+            console.log('✅ Servidor listo con Interledger');
+        } else {
+            console.log('⚠️ Servidor iniciado sin Interledger (modo fallback)');
+        }
         
-        // Flujo de pago entre pares
-        
-        // 1. Obtener una concesión para un pago entrante)
-        // 2. Obtener una concesión para un pago entrante  
-        // 3. Crear un pago entrante para el receptor
-        
-        return client;
+        return interledgerReady;
     } catch (error) {
-        console.error('Error configurando cliente Interledger:', error);
-        return null;
+        console.error('❌ Error en setup:', error);
+        return false;
     }
 }
+
+// Configuración inicial simplificada (sin Interledger por ahora)
+async function setupBasicServer() {
+    try {
+        console.log('🔧 Modo de desarrollo - Sin integración de Interledger');
+        return true;
+    } catch (error) {
+        console.error('❌ Error en configuración básica:', error.message);
+        return false;
+    }
+}
+
 
 app.get('/api/setup-db', async (req, res) => {
     const connection = await pool.getConnection();
@@ -159,13 +155,10 @@ app.post('/api/register', async (req, res) => {
             return res.status(400).json({ error: 'La contraseña debe tener entre 6 y 20 caracteres' });
         }
         
-        // Hash de la contraseña
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        // Registrar usuario con saldo inicial de 1000
+        // Registrar usuario sin encriptar contraseña
         const [result] = await pool.execute(
             'INSERT INTO users (name, email, password, saldo) VALUES (?, ?, ?, ?)', 
-            [name, email, hashedPassword, 1000.00]
+            [name, email, password, 1000.00]
         );
         
         console.log('Usuario registrado exitosamente:', result.insertId);
@@ -205,9 +198,8 @@ app.post('/api/login', async (req, res) => {
         
         const user = rows[0];
         
-        // Verificar contraseña
-        const isValidPassword = await bcrypt.compare(password, user.password);
-        if (!isValidPassword) {
+        // Verificar contraseña sin encriptación
+        if (password !== user.password) {
             return res.status(400).json({ error: 'Contraseña incorrecta' });
         }
         
@@ -471,10 +463,51 @@ app.post('/api/payments', async (req, res) => {
         // Calcular el monto individual que cada persona debe aportar
         const montoIndividual = tanda.total_amount / tanda.max_participants;
         
-        // Registrar el pago
+        // 🌟 INTEGRACIÓN INTERLEDGER - Enviar pago real
+        let paymentInfo = null;
+        if (type === 'contribution') {
+            try {
+                // Obtener wallets de emisor y receptor
+                const [senderInfo] = await connection.execute(
+                    'SELECT wallet_address FROM users WHERE id = ?', [user_id]
+                );
+                const [receiverInfo] = await connection.execute(
+                    'SELECT wallet_address FROM users WHERE id = ?', [tanda.current_user_id]
+                );
+                
+                if (senderInfo[0]?.wallet_address && receiverInfo[0]?.wallet_address) {
+                    console.log(`💸 Enviando $${amount} via Interledger`);
+                    console.log(`De: ${senderInfo[0].wallet_address} -> A: ${receiverInfo[0].wallet_address}`);
+                    
+                    paymentInfo = await interledgerService.sendPayment(
+                        senderInfo[0].wallet_address,
+                        receiverInfo[0].wallet_address,
+                        amount
+                    );
+                    
+                    console.log('✅ Pago Interledger iniciado:', paymentInfo.success);
+                } else {
+                    console.log('⚠️ Wallets no configuradas, continuando sin Interledger');
+                }
+            } catch (interledgerError) {
+                console.error('❌ Error en Interledger (continuando):', interledgerError.message);
+                // Continuar con el proceso normal aunque falle Interledger
+            }
+        }
+        
+        // Registrar el pago (como pending si hay Interledger)
+        const paymentStatus = paymentInfo ? 'pending' : 'completed';
+        const interledgerData = paymentInfo ? JSON.stringify({
+            continueUri: paymentInfo.continueUri,
+            continueToken: paymentInfo.continueToken,
+            quoteId: paymentInfo.quote.id,
+            walletResourceServer: paymentInfo.sendingWalletAddress.resourceServer,
+            walletAddress: paymentInfo.sendingWalletAddress.id
+        }) : null;
+        
         const [result] = await connection.execute(
-            'INSERT INTO payments (tanda_id, user_id, amount, type, status) VALUES (?, ?, ?, ?, ?)',
-            [tanda_id, user_id, amount, type, 'completed']
+            'INSERT INTO payments (tanda_id, user_id, amount, type, status, interledger_payment_id) VALUES (?, ?, ?, ?, ?, ?)',
+            [tanda_id, user_id, amount, type, paymentStatus, interledgerData]
         );
         
         if (type === 'contribution') {
@@ -519,11 +552,26 @@ app.post('/api/payments', async (req, res) => {
         }
         
         await connection.commit();
-        res.json({ 
+        
+        // Preparar respuesta base
+        let responseData = { 
             success: true, 
             paymentId: result.insertId,
             message: 'Pago registrado exitosamente' 
-        });
+        };
+        
+        // Si hay información de Interledger, incluirla en la respuesta
+        if (paymentInfo && paymentInfo.interactionUrl) {
+            // Agregar el paymentId a la URL de redirección
+            const redirectUrl = `${paymentInfo.interactionUrl}&paymentId=${result.insertId}`;
+            responseData.interledger = {
+                interactionUrl: redirectUrl,
+                paymentId: result.insertId
+            };
+            responseData.message = 'Pago registrado. Redirigiendo para completar transferencia...';
+        }
+        
+        res.json(responseData);
     } catch (error) {
         await connection.rollback();
         console.error('Error creando pago:', error);
@@ -537,12 +585,7 @@ app.post('/api/interledger/payment', async (req, res) => {
     try {
         const { paymentId, amount, walletAddress } = req.body;
         
-        const client = await setupInterledgerClient();
-        if (!client) {
-            return res.status(500).json({ error: 'Error configurando cliente Interledger' });
-        }
-        
-        console.log('Procesando pago con Interledger:', req.body);
+        console.log('🔧 Modo desarrollo - Simulando pago con Interledger:', req.body);
         
         if (paymentId) {
             await pool.execute(
@@ -553,12 +596,71 @@ app.post('/api/interledger/payment', async (req, res) => {
         
         res.json({ 
             success: true, 
-            message: 'Pago procesado con Interledger',
-            data: req.body
+            message: 'Pago simulado en modo desarrollo',
+            data: req.body,
+            note: 'En producción se procesaría con Interledger real'
         });
     } catch (error) {
-        console.error('Error en Interledger payment:', error);
+        console.error('Error en endpoint de pago:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Endpoint para confirmar pagos de Interledger
+app.get('/api/interledger/confirm', async (req, res) => {
+    try {
+        const { interact_ref, hash, paymentId } = req.query;
+        
+        if (!interact_ref || !hash) {
+            return res.status(400).json({ 
+                error: 'Faltan parámetros de confirmación' 
+            });
+        }
+        
+        console.log('🔄 Confirmando pago Interledger:', { interact_ref, hash, paymentId });
+        
+        // Si tenemos el paymentId, buscar la información del pago
+        if (paymentId) {
+            const [paymentRows] = await pool.execute(
+                'SELECT * FROM payments WHERE id = ? AND status = "pending"',
+                [paymentId]
+            );
+            
+            if (paymentRows.length > 0) {
+                const payment = paymentRows[0];
+                const interledgerData = JSON.parse(payment.interledger_payment_id);
+                
+                // Confirmar el pago usando el servicio
+                const confirmationResult = await interledgerService.confirmPayment(
+                    interledgerData.continueUri,
+                    interledgerData.continueToken,
+                    interledgerData.walletResourceServer,
+                    interledgerData.continueToken,
+                    interledgerData.walletAddress,
+                    interledgerData.quoteId
+                );
+                
+                if (confirmationResult.success) {
+                    // Actualizar el estado del pago
+                    await pool.execute(
+                        'UPDATE payments SET status = "completed" WHERE id = ?',
+                        [paymentId]
+                    );
+                    
+                    res.redirect(`/dashboard.html?payment=success&id=${paymentId}`);
+                } else {
+                    res.redirect(`/dashboard.html?payment=error&message=${encodeURIComponent('Error confirmando pago')}`);
+                }
+            } else {
+                res.redirect(`/dashboard.html?payment=error&message=${encodeURIComponent('Pago no encontrado')}`);
+            }
+        } else {
+            res.redirect(`/dashboard.html?payment=error&message=${encodeURIComponent('ID de pago faltante')}`);
+        }
+        
+    } catch (error) {
+        console.error('Error confirmando pago:', error);
+        res.redirect(`/dashboard.html?payment=error&message=${encodeURIComponent('Error de confirmación')}`);
     }
 });
 
@@ -572,19 +674,27 @@ app.get('/dashboard', (req, res) => {
 
 async function startServer() {
     try {
+        // Probar conexión a la base de datos
         const connection = await pool.getConnection();
+        console.log('✅ Conexión a MySQL exitosa');
         connection.release();
         
-        // Inicializar servicios de Interledger
-        await automationService.initialize();
-        automationService.scheduleAutomaticChecks();
+        // Configuración del servidor con Interledger
+        await setupServer();
         
         app.listen(PORT, () => {
-            console.log(`InterTand ejecutándose en http://localhost:${PORT}`);
-            console.log('🚀 Servicios de Interledger inicializados correctamente');
+            console.log(`✅ InterTand ejecutándose en http://localhost:${PORT}`);
+            console.log('� Servidor iniciado en modo desarrollo (sin Interledger)');
+            console.log('📋 Accede a:');
+            console.log(`   - Inicio: http://localhost:${PORT}`);
+            console.log(`   - Dashboard: http://localhost:${PORT}/dashboard`);
         });
     } catch (error) {
-        console.error('Error conectando a MySQL:', error.message);
+        console.error('❌ Error al iniciar servidor:', error.message);
+        console.log('\n🔧 Posibles soluciones:');
+        console.log('   1. Verificar que MySQL esté ejecutándose');
+        console.log('   2. Verificar credenciales en archivo .env');
+        console.log('   3. Verificar que la base de datos "inter_tand" exista');
         process.exit(1);
     }
 }

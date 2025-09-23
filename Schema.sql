@@ -10,6 +10,7 @@ CREATE TABLE users (
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     turno INT NOT NULL DEFAULT 0,
+    saldo DECIMAL(10,2) DEFAULT 0.00,
     wallet_address VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -55,3 +56,11 @@ CREATE TABLE tanda_participants (
     UNIQUE KEY unique_tanda_user (tanda_id, user_id),
     UNIQUE KEY unique_tanda_turn (tanda_id, turn_order)
 );
+
+-- Insertar usuarios por defecto con sus wallet addresses de Interledger
+INSERT INTO users (name, email, password, turno, saldo, wallet_address) VALUES
+('Manuel', 'manuel@gmail.com', '12345678', 1, 10000.00, 'https://ilp.interledger-test.dev/manuel'),
+('Oscar', 'oscar@gmail.com', '12345678', 2, 10000.00, 'https://ilp.interledger-test.dev/oscar'),
+('Alexa', 'alexa@gmail.com', '12345678', 3, 10000.00, 'https://ilp.interledger-test.dev/alexa');
+
+-- Nota: Las contraseñas están en texto plano para facilitar las pruebas
