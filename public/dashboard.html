@@ -18,10 +18,14 @@
     </nav>
 
     <div class="max-w-6xl mx-auto px-4 py-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div class="bg-white p-6 rounded shadow">
                 <h3 class="text-lg font-semibold text-gray-700">Tandas</h3>
                 <p class="text-3xl font-bold text-blue-600" id="totalTandas">0</p>
+            </div>
+            <div class="bg-white p-6 rounded shadow">
+                <h3 class="text-lg font-semibold text-gray-700">Mi Turno</h3>
+                <p class="text-3xl font-bold text-purple-600" id="miTurno">-</p>
             </div>
             <div class="bg-white p-6 rounded shadow">
                 <h3 class="text-lg font-semibold text-gray-700">Total</h3>
@@ -35,7 +39,7 @@
 
         <div class="bg-white rounded shadow p-6 mb-8">
             <h2 class="text-xl font-semibold mb-4">Nueva Tanda</h2>
-            <form onsubmit="createTanda(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <form onsubmit="createTanda(event)" class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
                     <input type="text" id="tandaName" required 
@@ -51,7 +55,17 @@
                     <input type="number" id="maxParticipants" required min="3" max="20"
                            class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 </div>
-                <div class="md:col-span-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Periodo</label>
+                    <select id="period" required 
+                            class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Seleccionar periodo</option>
+                        <option value="semanal">Semanal</option>
+                        <option value="quincenal">Quincenal</option>
+                        <option value="mensual">Mensual</option>
+                    </select>
+                </div>
+                <div class="md:col-span-4">
                     <button type="submit" 
                             class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">
                         Crear Tanda
@@ -93,6 +107,7 @@
             
             currentUser = JSON.parse(userData);
             document.getElementById('userName').textContent = currentUser.name;
+            document.getElementById('miTurno').textContent = currentUser.turno || 'Sin asignar';
             
             loadTandas();
             loadPayments();
@@ -120,6 +135,12 @@
             const name = document.getElementById('tandaName').value;
             const total_amount = parseInt(document.getElementById('totalAmount').value);
             const max_participants = parseInt(document.getElementById('maxParticipants').value);
+            const period = document.getElementById('period').value;
+            
+            if (!period) {
+                showMessage('Por favor selecciona un periodo', 'error');
+                return;
+            }
             
             try {
                 const response = await fetch('/api/tandas', {
@@ -128,7 +149,8 @@
                     body: JSON.stringify({
                         name,
                         total_amount,
-                        max_participants
+                        max_participants,
+                        period
                     })
                 });
                 
@@ -139,6 +161,7 @@
                     document.getElementById('tandaName').value = '';
                     document.getElementById('totalAmount').value = '';
                     document.getElementById('maxParticipants').value = '';
+                    document.getElementById('period').value = '';
                     loadTandas();
                 } else {
                     showMessage(data.error || 'Error al crear tanda', 'error');
@@ -160,24 +183,48 @@
                 if (tandas.length === 0) {
                     container.innerHTML = '<div class="p-6 text-gray-500 text-center">No hay tandas disponibles</div>';
                 } else {
-                    container.innerHTML = tandas.map(tanda => `
+                    container.innerHTML = tandas.map(tanda => {
+                        // Verificar si el usuario actual es el del turno
+                        const isCurrentTurn = currentUser.id === tanda.current_user_id;
+                        const montoIndividual = tanda.total_amount / tanda.max_participants;
+                        
+                        return `
                         <div class="p-6">
                             <div class="flex justify-between items-start">
-                                <div>
+                                <div class="flex-1">
                                     <h3 class="font-semibold text-lg">${tanda.name}</h3>
                                     <div class="mt-2 space-y-1">
-                                        <p class="text-sm">Monto: $${tanda.total_amount.toLocaleString()}</p>
+                                        <p class="text-sm">Monto Total: $${tanda.total_amount.toLocaleString()}</p>
+                                        <p class="text-sm">Acumulado: $${(tanda.current_amount || 0).toLocaleString()}</p>
                                         <p class="text-sm">Participantes: ${tanda.max_participants}</p>
-                                        <p class="text-sm">Pago mensual: $${(tanda.total_amount / tanda.max_participants).toLocaleString()}</p>
+                                        <p class="text-sm">Pago ${tanda.period}: $${montoIndividual.toLocaleString()}</p>
+                                        <p class="text-sm">Turno actual: ${tanda.current_turn} ${tanda.current_user_name ? `(${tanda.current_user_name})` : ''}</p>
+                                        <p class="text-sm">Periodo: <span class="capitalize">${tanda.period}</span></p>
+                                        ${isCurrentTurn ? '<p class="text-sm font-bold text-green-600">🎉 ¡Es tu turno de recibir!</p>' : ''}
+                                        <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                                            <div class="bg-blue-600 h-2 rounded-full" 
+                                                 style="width: ${((tanda.current_amount || 0) / tanda.total_amount) * 100}%"></div>
+                                        </div>
                                     </div>
                                 </div>
-                                <button onclick="createPayment(${tanda.id})" 
-                                        class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">
-                                    Pagar
-                                </button>
+                                <div class="ml-4 space-y-2">
+                                    <button onclick="joinTanda(${tanda.id})" 
+                                            class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 block w-full">
+                                        Unirse
+                                    </button>
+                                    ${isCurrentTurn ? 
+                                        '<button disabled class="bg-gray-400 text-white px-3 py-1 rounded text-sm block w-full cursor-not-allowed">Tu turno - No puedes pagar</button>' :
+                                        `<button onclick="createPayment(${tanda.id}, ${montoIndividual})" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 block w-full">Pagar $${montoIndividual.toLocaleString()}</button>`
+                                    }
+                                    <button onclick="viewParticipants(${tanda.id})" 
+                                            class="bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700 block w-full">
+                                        Ver
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    `).join('');
+                        `;
+                    }).join('');
                 }
             } catch (error) {
                 showMessage('Error cargando tandas', 'error');
@@ -226,9 +273,14 @@
             }
         }
 
-        async function createPayment(tandaId) {
-            const amount = prompt('Ingresa el monto del pago:');
+        async function createPayment(tandaId, suggestedAmount) {
+            const amount = prompt(`Ingresa el monto del pago (sugerido: $${suggestedAmount.toLocaleString()}):`, suggestedAmount);
             if (!amount || isNaN(amount)) return;
+            
+            if (parseFloat(amount) <= 0) {
+                showMessage('El monto debe ser mayor a cero', 'error');
+                return;
+            }
             
             try {
                 const response = await fetch('/api/payments', {
@@ -247,11 +299,58 @@
                 if (data.success) {
                     showMessage('Pago registrado exitosamente');
                     loadPayments();
+                    loadTandas(); // Recargar para ver el progreso actualizado
                 } else {
                     showMessage(data.error || 'Error al registrar pago', 'error');
                 }
             } catch (error) {
                 showMessage('Error de conexión', 'error');
+            }
+        }
+
+        async function joinTanda(tandaId) {
+            if (!confirm('¿Deseas unirte a esta tanda?')) return;
+            
+            try {
+                const response = await fetch(`/api/tandas/${tandaId}/join`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.id
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(`Te has unido exitosamente. Tu turno es: ${data.turnOrder}`);
+                    // Actualizar el turno del usuario en la interfaz
+                    currentUser.turno = data.turnOrder;
+                    localStorage.setItem('user', JSON.stringify(currentUser));
+                    document.getElementById('miTurno').textContent = data.turnOrder;
+                    loadTandas();
+                } else {
+                    showMessage(data.error || 'Error al unirse a la tanda', 'error');
+                }
+            } catch (error) {
+                showMessage('Error de conexión', 'error');
+            }
+        }
+
+        async function viewParticipants(tandaId) {
+            try {
+                const response = await fetch(`/api/tandas/${tandaId}/participants`);
+                const data = await response.json();
+                
+                if (data.participants) {
+                    const participantsList = data.participants.map(p => 
+                        `${p.turn_order}. ${p.name} ${p.has_received ? '✅' : '⏳'}`
+                    ).join('\\n');
+                    
+                    alert(`Participantes de la tanda:\\n\\n${participantsList}`);
+                }
+            } catch (error) {
+                showMessage('Error obteniendo participantes', 'error');
             }
         }
     </script>
