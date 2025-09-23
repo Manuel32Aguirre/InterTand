@@ -13,9 +13,9 @@ app.use(express.static('public'));
 // Configuración de base de datos usando variables de entorno
 const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3307,
-    user: process.env.DB_USER || 'manuel',
-    password: process.env.DB_PASSWORD || '1234',
+    port: process.env.DB_PORT || 3306,
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || 'D+Oscar08',
     database: process.env.DB_NAME || 'inter_tand',
     waitForConnections: true,
     connectionLimit: 10,
